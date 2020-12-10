@@ -5,7 +5,7 @@ set(CMAKE_BUILD_TYPE Release)
 cmake_policy(SET CMP0072 NEW)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_CXX_FLAGS "-Werror -Wall")
+set(CMAKE_CXX_FLAGS "-Werror -Wall -g")
 ##################################
 find_package(OpenGL REQUIRED)
 find_package(glfw3 3.3 REQUIRED)

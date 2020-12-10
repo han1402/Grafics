@@ -53,7 +53,7 @@ camera.yaw   = -90.0f;
 camera.pitch = 0.0f;
 camera.last_x = 400;
 camera.last_y = 300;
-camera.camera_pos   = glm::vec3(2.0f, 0.0f,  2.0f);
+camera.camera_pos   = glm::vec3(3.0f, 1.0f,  3.0f);
 camera.camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
 camera.camera_up    = glm::vec3(0.0f, 1.0f,  0.0f);
 camera.first_mouse = true;
@@ -86,6 +86,15 @@ GLuint post_VAO = set_post_vao();
 GLuint tex_color_buffer;
 GLuint post_BUFF = set_post_buffer(tex_color_buffer, camera.screen_width , camera.screen_height);
 GLuint post_SH = compl_shader("../shaders/eff_post_v.c", "../shaders/eff_post_f.c");
+
+GLuint main_SH = compl_shader("../shaders/main_v.c", "../shaders/main_f.c");
+GLuint plane_vao = set_plane_vao1();
+myMaterial material;
+load_textures(material.diffuse_color , material.specular_map );
+
+
+
+//std::cout << "YES" << main_SH << plane_vao << material.diffuse_color << std::endl;
 /***********************************************************************************/
     while(!glfwWindowShouldClose(window)){
         glfwPollEvents();
@@ -102,9 +111,20 @@ GLuint post_SH = compl_shader("../shaders/eff_post_v.c", "../shaders/eff_post_f.
         glm::mat4 view = glm::lookAt(camera.camera_pos, camera.camera_pos + camera.camera_front, camera.camera_up);
         glm::mat4 projection = glm::perspective(0.78539f, camera.screen_width / camera.screen_height, 0.1f, 100.0f);
         
-        my_drow_light(light_VAO, light_SH, model, view, projection);
 
-        my_drow_glass_box( glass_vao,  glass_SH, glm::translate(glm::mat4(1.0f), glm::vec3(4.0f, 1.0f, 4.0f)), view,  projection, sky_tex,  camera.camera_pos);
+        glm::vec3 light_position = glm::vec3(2.0f + 4.0f*glm::sin(2*glfwGetTime()), 1.0f, 2.0f);
+        model = glm::translate(model, light_position);
+        model = glm::scale(model, glm::vec3(0.4f));
+        my_drow_light(light_VAO, light_SH, model, view, projection);
+        model = glm::mat4(1.0f);
+
+
+
+        my_drow_glass_box( glass_vao,  glass_SH, glm::translate(glm::mat4(1.0f), glm::vec3(4.0f, 3.0f, 4.0f)), view,  projection, sky_tex,  camera.camera_pos);
+
+        drow_plane1(main_SH, plane_vao, camera.camera_pos, light_position, material, model,  view, projection);
+
+
 
         drow_sky_box(sky_VAO, sky_SH, sky_tex,  model,  view, projection);
         drow_bilbords(  bilb_SH , bilb_vao, view, projection,   camera.camera_pos, bilb_tex);
@@ -189,7 +209,7 @@ int my_camera_step(){
     GLfloat new_time = glfwGetTime();
     camera.delta_time = new_time - camera.last_time;
     camera.last_time = new_time;
-    GLfloat speed = 0.6f * camera.delta_time;
+    GLfloat speed = 1.3f * camera.delta_time;
 
     glm::vec3 dirfront;
     dirfront.x = cos(camera.pitch * 0.017453f) * cos(camera.yaw * 0.017453f);
