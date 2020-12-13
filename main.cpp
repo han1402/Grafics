@@ -66,34 +66,41 @@ for(int i = 0; i < 4; i++){
     int wwidth, wheight;
     glfwGetFramebufferSize(window, &wwidth, &wheight);
     glViewport(0, 0, wwidth, wheight);
+    camera.screen_width = wwidth;
+    camera.screen_height = wheight;
 /***************************************SHADERS*************************************/
-GLuint light_SH = compl_shader("../shaders/c_light_v.c", "../shaders/c_light_f.c");
+GLuint light_SH = compl_shader("./shaders/c_light_v.c", "./shaders/c_light_f.c");
 GLuint light_VAO = my_set_light_vao();
 
-GLuint sky_SH = compl_shader("../shaders/sky_v.c", "../shaders/sky_f.c");
+GLuint sky_SH = compl_shader("./shaders/sky_v.c", "./shaders/sky_f.c");
 GLuint sky_tex = set_sky_box_tex();
 GLuint sky_VAO = set_sky_box_vao();
 
-GLuint glass_SH = compl_shader("../shaders/glass_v.c", "../shaders/glass_f.c");
+GLuint glass_SH = compl_shader("./shaders/glass_v.c", "./shaders/glass_f.c");
 GLuint glass_vao = set_glass_vao();
 
 GLuint bilb_vao =  bilb_setvao();
-GLuint bilb_tex =  loaad_bilboard_texture("../textures/CrackScreen.png");
-GLuint bilb_SH = compl_shader("../shaders/bilb_v.c", "../shaders/bilb_f.c");
+GLuint bilb_tex =  loaad_bilboard_texture("./textures/CrackScreen.png");
+GLuint bilb_SH = compl_shader("./shaders/bilb_v.c", "./shaders/bilb_f.c");
 
 camera.peff = false;
 GLuint post_VAO = set_post_vao();
 GLuint tex_color_buffer;
 GLuint post_BUFF = set_post_buffer(tex_color_buffer, camera.screen_width , camera.screen_height);
-GLuint post_SH = compl_shader("../shaders/eff_post_v.c", "../shaders/eff_post_f.c");
+GLuint post_SH = compl_shader("./shaders/eff_post_v.c", "./shaders/eff_post_f.c");
 
-GLuint main_SH = compl_shader("../shaders/main_v.c", "../shaders/main_f.c");
+GLuint main_SH = compl_shader("./shaders/main_v.c", "./shaders/main_f.c");
 GLuint plane_vao = set_plane_vao1();
 myMaterial material;
-load_textures(material.diffuse_color , material.specular_map );
+material.blue_ex = false;
+camera.if_paralax = false;
+load_textures(material.diffuse_color , material.specular_map , material.normal_map, material.paralax);
 
 
-
+GLuint cubes_VAO = set_cubes_vao_nt();
+GLuint shadow_SH = compl_shader("./shaders/main_shadow_v.c", "./shaders/main_shadow_f.c");
+GLuint shadow_buffer;
+shadow_buffer_and_text(shadow_buffer, material.shadow_map ,  camera.screen_width,  camera.screen_height);
 //std::cout << "YES" << main_SH << plane_vao << material.diffuse_color << std::endl;
 /***********************************************************************************/
     while(!glfwWindowShouldClose(window)){
@@ -101,35 +108,87 @@ load_textures(material.diffuse_color , material.specular_map );
         my_camera_step();
         glClearColor(0.0f, 0.1f, 0.9f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glViewport(0, 0, wwidth, wheight);
 
-        if(camera.peff){
-            glBindFramebuffer(GL_FRAMEBUFFER, post_BUFF);
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); 
-        }
         glm::mat4 model(1.0f);
         glm::mat4 view = glm::lookAt(camera.camera_pos, camera.camera_pos + camera.camera_front, camera.camera_up);
         glm::mat4 projection = glm::perspective(0.78539f, camera.screen_width / camera.screen_height, 0.1f, 100.0f);
-        
+        glm::vec3 light_position = glm::vec3(3.5f + 5.0f*glm::sin(1.5f*glfwGetTime()), 3.5f, 2.0f);
+///INIT
 
-        glm::vec3 light_position = glm::vec3(2.0f + 4.0f*glm::sin(2*glfwGetTime()), 1.0f, 2.0f);
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, shadow_buffer);
+//    glViewport(0, 0, wwidth, wheight);
+        glViewport(0, 0, camera.screen_width, camera.screen_height);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        float ap = 1.0f, bp = 12.0f;
+        glm::mat4 light_projection = glm::ortho(-15.0f, 15.0f, -15.0f, 15.0f, ap, bp);
+        glm::mat4 light_view = glm::lookAt(light_position, glm::vec3(3.8f, 0.0f, -0.2f), glm::normalize(glm::vec3( 0.0f, 1.0f,  0.0f)));
+        glm::mat4 shadow_m = light_projection * light_view;
+        material.sh_matrix = shadow_m;
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
+        for(int i = 0; i < 3; i++){
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(5.0f - 1.5f*i , 1.0f + 0.1f*i, -1.0f - 0.1f*i ));//glm::vec3(5.0f - 1.2f*i , 1.0f + 0.1f*i, -1.0f - 0.1f*i )
+            model = glm::scale(model, glm::vec3(0.4f + 0.1f*i));
+            drow_plane1(36, shadow_SH, cubes_VAO, camera.camera_pos, light_position, material, model,  view, projection);
+        }
+        glCullFace(GL_BACK); 
+        glDisable(GL_CULL_FACE);  
+        model = glm::mat4(1.0f);
+        drow_plane1(6, shadow_SH, plane_vao, camera.camera_pos, light_position, material, model,  view, projection);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, wwidth, wheight);
+///SHADOW
+        if(camera.peff){
+            glBindFramebuffer(GL_FRAMEBUFFER, post_BUFF);
+    glViewport(0, 0, wwidth, wheight);
+//        glViewport(0, 0, camera.screen_width, camera.screen_height);
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); 
+        }
+
         model = glm::translate(model, light_position);
-        model = glm::scale(model, glm::vec3(0.4f));
+        model = glm::scale(model, glm::vec3(0.1f));
         my_drow_light(light_VAO, light_SH, model, view, projection);
         model = glm::mat4(1.0f);
 
-
-
         my_drow_glass_box( glass_vao,  glass_SH, glm::translate(glm::mat4(1.0f), glm::vec3(4.0f, 3.0f, 4.0f)), view,  projection, sky_tex,  camera.camera_pos);
 
-        drow_plane1(main_SH, plane_vao, camera.camera_pos, light_position, material, model,  view, projection);
 
+glEnable(GL_STENCIL_TEST);
+glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);  
+glStencilFunc(GL_ALWAYS, 1, 0xFF); 
+glStencilMask(0xFF);
+        for(int i = 0; i < 3; i++){
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(5.0f - 1.5f*i , 1.0f + 0.1f*i, -1.0f - 0.1f*i ));
+            model = glm::scale(model, glm::vec3(0.4f + 0.1f*i));
+            drow_plane1(36, main_SH, cubes_VAO, camera.camera_pos, light_position, material, model,  view, projection);
+        }
+glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+glStencilMask(0x00);
+material.blue_ex = true;
+        for(int i = 0; i < 3; i++){
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(5.0f - 1.5f*i , 1.0f + 0.1f*i, -1.0f - 0.1f*i ));
+            model = glm::scale(model, glm::vec3(0.4f + 0.1f*i));
+            model = glm::scale(model, glm::vec3(1.05f));
+            drow_plane1(36, main_SH, cubes_VAO, camera.camera_pos, light_position, material, model,  view, projection);
+        }
+material.blue_ex = false;
+glStencilMask(0xFF);
+glDisable(GL_STENCIL_TEST);
 
+            model = glm::mat4(1.0f);
+            material.if_paralax = camera.if_paralax;
+            drow_plane1(6, main_SH, plane_vao, camera.camera_pos, light_position, material, model,  view, projection);
+            material.if_paralax = false;
 
         drow_sky_box(sky_VAO, sky_SH, sky_tex,  model,  view, projection);
         drow_bilbords(  bilb_SH , bilb_vao, view, projection,   camera.camera_pos, bilb_tex);
         if(camera.peff){
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
             drow_post_effect( tex_color_buffer ,  post_VAO,  post_SH);
+    glViewport(0, 0, wwidth, wheight);
         }
         glfwSwapBuffers(window);
     }
@@ -177,6 +236,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                 camera.peff = true;
             }else{
                 camera.peff = false;
+            }
+        }
+    }
+    if(key == GLFW_KEY_P){
+        if(action == GLFW_PRESS){
+            if(camera.if_paralax == false){
+                camera.if_paralax = true;
+            }else{
+                camera.if_paralax = false;
             }
         }
     }
